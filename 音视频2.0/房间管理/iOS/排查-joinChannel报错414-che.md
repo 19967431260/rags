@@ -39,3 +39,4 @@ updated: 2026-03-15
 ## 其他触发场景
 
 （合并时在此处追加）
+- [iOS] joinChannel报错414 check checksum error，来源：['上海功途教育']，2026-03-15
