@@ -9,7 +9,7 @@ root_cause: 发送消息时未设置pushContent字段
 solution: 在发送消息时设置NIMMessageSetting的apnsContent或apnsPayload字段，配置推送显示内容
 customers: ['上海奇已科技']
 source: chat_history
-tags: ['离线推送', 'pushContent', 'iOS', 'APNS']
+tags: ['APNS', 'iOS', 'pushContent', '离线推送']
 created: 2026-01-05
 updated: 2026-03-15
 ---
