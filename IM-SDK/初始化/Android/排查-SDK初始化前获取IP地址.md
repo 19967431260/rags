@@ -7,12 +7,13 @@ platform: Android
 title: SDK初始化前获取IP地址
 root_cause: SDK 9.19.4版本在初始化阶段会获取IP地址。
 solution: 更新SDK至9.21.0或更高版本，该问题已在新版本中优化。参考最佳实践：https://doc.yunxin.163.com/messaging/guide/Tg3NDExMDA?platform=android
-customers: ["深圳富旅奇缘"]
+customers: ["深圳富旅奇缘", "深圳岚峰创视"]
 source: chat_history
-tags: ["IP获取", "隐私合规", "9.19.4", "9.21.0", "初始化"]
+tags: ["9.21.0", "初始化", "隐私合规", "9.19.4", "IP获取"]
 created: 2026-01-08
 updated: 2026-03-15
 ---
+
 
 ## 问题：Android SDK初始化前获取IP地址
 
