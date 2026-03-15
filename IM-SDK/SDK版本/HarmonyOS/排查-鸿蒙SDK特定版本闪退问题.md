@@ -7,7 +7,7 @@ platform: HarmonyOS
 title: 鸿蒙SDK特定版本闪退问题
 root_cause: SDK版本不统一可能导致兼容性问题
 solution: 固定SDK版本号，确保项目中所有依赖的SDK版本统一。如可复现建议提供最小demo给技术支持排查。
-customers: ["2.0云信-长沙代客"]
+customers: ['2.0云信-长沙代客', '2_0云信-长沙代客']
 source: chat_history
 tags: ["版本兼容", "闪退", "SDK版本", "HarmonyOS"]
 created: 2026-02-26
