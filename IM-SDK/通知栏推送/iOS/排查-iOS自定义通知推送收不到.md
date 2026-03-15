@@ -7,11 +7,17 @@ platform: iOS
 title: iOS自定义通知推送收不到
 root_cause: SDK初始化时传入的pushName与控制台配置的推送证书名称不一致
 solution: 确保SDK初始化时apnsCername参数与控制台配置的证书名称一致,参考文档：https://doc.yunxin.163.com/messaging2/guide/TUzNDAwNDY?platform=client
-customers: ["南京企之诚国际贸易有限公司"]
+customers:
+- 南京企之诚国际贸易有限公司
 source: chat_history
-tags: ["sendCustomNotification", "iOS推送", "证书配置", "pushName", "自定义通知"]
-created: 2026-02-11
-updated: 2026-03-16
+tags:
+- sendCustomNotification
+- iOS推送
+- 证书配置
+- pushName
+- 自定义通知
+created: '2026-02-11'
+updated: '2026-03-16'
 ---
 
 ## 问题：iOS iOS自定义通知推送收不到
@@ -35,6 +41,3 @@ SDK初始化时传入的pushName与控制台配置的推送证书名称不一致
 ## 解决方案
 
 确保SDK初始化时apnsCername参数与控制台配置的证书名称一致,参考文档：https://doc.yunxin.163.com/messaging2/guide/TUzNDAwNDY?platform=client
-
-## 其他触发场景
-
