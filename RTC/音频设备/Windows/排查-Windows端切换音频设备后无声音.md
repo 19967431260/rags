@@ -9,7 +9,7 @@ root_cause: Windows端设备切换后SDK未正确处理音频流重定向
 solution: 1.使用SDK提供的设备切换接口 2.确保在设备变更回调中正确处理 3.如问题持续，升级到最新SDK版本
 customers: ['杭州晓宇-红蓝CP']
 source: chat_history
-tags: ['Windows', '音频设备', '设备切换', '无声音']
+tags: ['无声音', '音频设备', 'Windows', '设备切换']
 created: 2026-01-20
 updated: 2026-03-15
 ---
