@@ -7,7 +7,7 @@ platform: iOS
 title: iOS离线推送不显示内容
 root_cause: 发送消息时未设置pushContent字段
 solution: 在发送消息时设置NIMMessageSetting的apnsContent或apnsPayload字段，配置推送显示内容
-customers: ['上海奇已科技']
+customers: ["'上海奇已科技'", "VIP-云信-上海奇已科技"]
 source: chat_history
 tags: ['APNS', 'iOS', 'pushContent', '离线推送']
 created: 2026-01-05
@@ -33,3 +33,6 @@ iOS端收到离线推送，但推送内容为空，只显示应用名称
 ## 解决方案
 
 在发送消息时设置NIMMessageSetting的apnsContent或apnsPayload字段，配置推送显示内容
+
+## 其他触发场景
+- [iOS] iOS离线推送不显示内容，来源：上海奇已科技，2026-03-15
