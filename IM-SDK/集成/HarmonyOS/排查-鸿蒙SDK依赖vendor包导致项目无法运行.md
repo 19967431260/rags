@@ -9,7 +9,7 @@ root_cause: 依赖路径配置错误，vendor工具类包未正确引入
 solution: 对比官方demo的依赖方式进行配置。远端依赖时base库会自动拉取vendor，本地har依赖时需要单独引入vendor包。参考：https://github.com/netease-im/nim-harmony-demo
 customers: ["2.0云信-长沙代客"]
 source: chat_history
-tags: ["HarmonyOS", "vendor", "依赖配置", "集成问题"]
+tags: ["依赖配置", "集成问题", "HarmonyOS", "vendor"]
 created: 2026-02-25
 updated: 2026-03-15
 ---
