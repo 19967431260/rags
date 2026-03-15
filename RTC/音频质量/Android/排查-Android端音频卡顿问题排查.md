@@ -9,7 +9,7 @@ root_cause: 音频采集频率不稳定导致卡顿
 solution: 建议检查设备性能和后台进程占用情况，确保音频采集线程优先级足够高
 customers: ['北京易连忆生']
 source: chat_history
-tags: ['音频卡顿', '采集不稳定', 'Android', '性能问题']
+tags: ['音频卡顿', '性能问题', 'Android', '采集不稳定']
 created: 2026-01-04
 updated: 2026-03-15
 ---
