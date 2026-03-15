@@ -39,3 +39,4 @@ Android V9 SDK发送消息时报错414 check checksum error，但登录成功。
 
 ## 其他触发场景
 
+- [Android] V9发送消息报错414 check checksum error，来源：['湖南惠农']，2026-03-15
