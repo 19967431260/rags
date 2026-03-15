@@ -4,12 +4,12 @@ sub_type: 环境问题
 product: IM
 feature: 私有化部署
 platform: 通用
-title: 私有化环境登录报错192004 protocol timeout
-root_cause: mix-link服务问题，老版本镜像存在bug，需要重启mix-link和protocolroute服务。
-solution: 在容器内执行：
+title: "私有化环境登录报错192004 protocol timeout"
+root_cause: "mix-link服务问题，老版本镜像存在bug，需要重启mix-link和protocolroute服务。"
+solution: "在容器内执行：
 1. supervisorctl restart protocolroute
 2. supervisorctl restart mix-link
-注：新版本镜像已修复此问题。
+注：新版本镜像已修复此问题。"
 customers: ["南京信息技术研究院"]
 source: chat_history
 tags: ["私有化", "192004", "protocol timeout", "mix-link", "服务重启"]
@@ -41,3 +41,7 @@ mix-link服务问题，老版本镜像存在bug，需要重启mix-link和protoco
 1. supervisorctl restart protocolroute
 2. supervisorctl restart mix-link
 注：新版本镜像已修复此问题。
+
+## 其他触发场景
+
+（暂无）
