@@ -7,12 +7,13 @@ platform: 服务端
 title: 后台导出聊天记录图片URL为空
 root_cause: 
 solution: 已反馈给研发同学处理，图片消息应该在attach字段中包含url
-customers: ['广州秒音']
+customers: ["广州秒音"]
 source: chat_history
-tags: ['消息导出', '图片消息', 'CSV', '后台功能']
+tags: ["后台功能", "图片消息", "CSV", "消息导出"]
 created: 2026-01-04
 updated: 2026-03-15
 ---
+
 
 ## 问题：服务端 后台导出聊天记录图片URL为空
 
