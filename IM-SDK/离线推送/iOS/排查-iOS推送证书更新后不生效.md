@@ -7,7 +7,7 @@ platform: iOS
 title: iOS推送证书更新后不生效
 root_cause: 客户端初始化时会绑定证书名，更换证书名后客户端无法匹配
 solution: 在原有证书名上重新上传证书，不要更改证书名称，因为客户端初始化时已经写入了证书名，存在绑定关系。
-customers: ["北京智慧树"]
+customers: ["北京智慧树", "上海超旺信息科技有限公司"]
 source: chat_history
 tags: ["推送证书", "证书更新", "证书名绑定", "iOS"]
 created: 2026-01-15
