@@ -7,7 +7,7 @@ platform: Web
 title: getHistoryMsgs查不到昨天的消息
 root_cause: getHistoryMsgs接口的beginTime参数传值错误，传入了订单创建时间而非历史查询起始时间，导致只能查到当天消息
 solution: getHistoryMsgs接口的beginTime参数如果不确定传什么值，可以传0，这样可以查询到所有历史消息
-customers: ["创业慧康科技股份"]
+customers: ["创业慧康科技股份", "杭州东方网升"]
 source: chat_history
 tags: ["getHistoryMsgs", "beginTime", "历史消息", "参数错误", "Web"]
 created: 2026-02-02
