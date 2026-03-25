@@ -1,0 +1,26 @@
+---
+track_type: 排查类
+sub_type: 使用问题
+product: IM-SDK
+feature: 质量监控
+platform: Web
+title: Web端SDK版本上报异常导致登录成功率数据偏低
+root_cause: web端SDK版本上报有异常，导致会有大量重复的连接失败上报
+solution: 升级到9.17.0或以上版本，优化了上报问题
+customers: ['北京兔玩在线']
+source: chat_history
+tags: ['指南针', '登录成功率', 'SDK版本', '上报异常', 'Web端']
+created: 2025-09-22
+updated: 2026-03-25
+---
+
+## 问题：Web Web端SDK版本上报异常导致登录成功率数据偏低
+
+## 问题详情
+
+**现象**：
+客户在指南针模块查看质量数据时，发现Web端登录成功率被标记为很差。经排查是web端当前SDK版本上报有异常，导致有大量重复的连接失败上报，拉低了数据。
+
+## 解决方案
+
+升级到9.17.0或以上版本，优化了上报问题
