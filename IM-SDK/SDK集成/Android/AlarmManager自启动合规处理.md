@@ -1,0 +1,16 @@
+---
+track_type: 咨询类
+sub_type: 能力与边界咨询
+product: IM-SDK
+feature: SDK集成
+updated: 2025-07-25
+---
+
+<!-- entry: platform=Android, created=2025-07-21, customers=["智己群"], source=chat_history, frequency=1, tags=["AlarmManager","自启动","合规","NimReceiver"] -->
+## Q: AlarmManager自启动合规问题：去掉NimReceiver即可
+
+**问题描述**：合规检测发现NimService有自启动问题，AlarmManager 15分钟唤醒一次广播尝试启动NimService
+
+**答案**：按照合规文档处理，把NimReceiver去掉即可解决自启动合规问题。
+
+---
