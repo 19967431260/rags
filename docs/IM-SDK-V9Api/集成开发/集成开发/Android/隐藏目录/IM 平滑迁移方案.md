@@ -1,0 +1,303 @@
+<!---keywords:IM即时通讯迁移方案，IM架构，im系统，im服务器架构，im技术架构，群组迁移，IM账号迁移--->
+<!---description:网易云信多年来的稳定IM即时通讯服务，在开发者中积累了良好的口碑。部分开发者希望接入云信的IM服务，但正在使用自研或友商提供的即时通讯服务。针对这一场景，网易云信为客户贴身打造了一套迁移方案，并且成功为多家客户实现了平滑迁移。--->
+
+  
+
+网易云信多年来的[**稳定IM即时通讯服务**](https://yunxin.163.com/im)，在开发者中积累了良好的口碑。部分开发者希望接入云信的IM服务，但正在使用自研或友商提供的即时通讯服务。针对这一场景，网易云信为客户贴身打造了一套迁移方案，并且成功为多家客户实现了平滑迁移。
+
+
+## <span id="基本概念">基本概念</span>
+
+- 应用服务器：客户方自有，服务于应用层功能的服务器。
+- 云信IM服务器：网易云信提供的服务于IM功能的服务器。
+- 原IM服务器：用户原先实现IM功能的服务器，可以是自有服务器或友商提供的云服务
+- 老应用：与原IM服务器链接的老版本app。
+- 新应用：迁移后与云信IM服务器连接的新版本app。
+
+
+## <span id="前期准备">前期准备</span>
+
+进行IM平滑迁移，需要提前进行以下准备：
+
+- [注册网易云信账号](https://id.grow.163.com/register?h=media&t=media&clueFrom=nim&from=nim&referrer=https%3A%2F%2Fapp.yunxin.163.com%2F%3Ffrom%3Dnim)，创建应用并开通IM功能。
+- 如原IM服务器为友商提供的云服务，需要导出用户资料和用户关系等。
+
+
+
+## <span id="迁移方式">迁移方式</span>
+### <span id="强制升级迁移">强制升级迁移</span>
+
+强制升级迁移的方式，是指在完成云信IM接入后，新应用上架，强制所有的老应用升级至新应用的迁移方式。此方式下不存在新老应用的兼容问题。
+
+![](https://yx-web-nosdn.netease.im/quickhtml%2Fassets%2Fyunxin%2Fhzyushaohua%2FIMG20180918_1.png)
+
+
+### <span id="新老兼容迁移">新老兼容迁移</span>
+
+新老兼容迁移的方式，是指在迁移过程中，云信IM服务器和原IM服务器同时提供服务，新应用和旧应用并存，支持新旧应用互通。待用户逐步更新至新应用，旧应用逐步无人使用后，原IM服务器停止服务。
+
+![](https://yx-web-nosdn.netease.im/quickhtml%2Fassets%2Fyunxin%2Fhzyushaohua%2FIMG20180918_2.png)
+
+新老兼容迁移过程中，会涉及到新老应用的增量消息发送的保障。因此需要原IM服务器可以提供消息抄送和服务端发送消息的功能。一条消息由老应用的用户发送到新应用的用户，需要经历以下几个步骤：
+
+1. 老应用用户发送消息至原IM服务器
+2. 原IM服务器提供消息抄送功能，将消息抄送给应用服务器
+3. 应用服务器收到消息抄送后，调用云信提供的服务端消息发送API发送消息
+4. 云信服务器将消息发送给新应用的指定用户
+
+反之，一条消息由新应用发送到老应用，也通过类似的4个步骤实现。
+
+
+### <span id="优势对比">优势对比</span>
+
+不同的迁移方式适应不同的场景，各有优劣，需要依赖的条件也不同。详情如下：
+![](https://yx-web-nosdn.netease.im/quickhtml%2Fassets%2Fyunxin%2Fhzyushaohua%2FIMG20180918_3.png)
+
+
+## <span id="迁移流程">迁移流程</span>
+
+![](https://yx-web-nosdn.netease.im/quickhtml%2Fassets%2Fyunxin%2Fhzyushaohua%2FIMG20180918_4.png)
+
+
+## <span id="迁移步骤">迁移步骤</span>
+
+**注：以下接口调用时，请将调用频次控制在1秒100次以下。以免触发频控导致调用失败。**
+
+
+### <span id="1、用户资料迁移">1、用户资料迁移</span>
+
+使用[注册账号](https://doc.yunxin.163.com/messaging/guide/DQ3Nzk1MTY?platform=server)完成对应用户账号的注册与用户资料迁移。后续也可以通过[设置用户资料](/docs/TM5MzM5Njk/zI0NzYyMDQ?#更新用户名片)完成用户资料的二次修改。
+
+注：请先完成用户迁移，再进行后续操作。请在自身业务服务器上维护记录好所有用户的account id。
+
+
+
+### <span id="2、用户关系迁移">2、用户关系迁移</span>
+
+根据云信官网提供的[用户关系托管](/docs/TM5MzM5Njk/DQ0MTY1NzI)接口完成好友、黑名单等关系的迁移。
+
+
+### <span id="3、群组迁移">3、群组迁移</span>
+
+根据云信官网提供的[群组功能](https://doc.yunxin.163.com/messaging/guide/Dk4MDY3MzQ?platform=server)相关接口完成群组的迁移。
+
+注：请在自身业务服务器上维护记录好所有群组tid。
+
+### <span id="4、历史消息迁移">4、历史消息迁移</span>
+
+
+若图片、语音等消息里的文件也要迁移并存储到云信服务器，需先使用[文件上传](https://doc.yunxin.163.com/messaging/guide/zQyNDM0NzE?platform=server)接口完成上传来拿到云信返回的 url，然后替换原消息体中的 url。
+
+#### <span id="4.1 历史存量消息(迁移前已产生)">4.1 历史存量消息(迁移前已产生)</span>
+
+
+历史存量消息，一般为某个约定时刻之前（约定时刻之后的参见下文增量消息）的历史消息，请按照要求提供以下信息：
+ - 按照要求构造消息体，存放在文本文件中。（注：文件后缀建议为 .txt，每条消息独占一行，详见消息体格式介绍章节。**单聊与群聊消息请分开单独提供。建议各自一个文本文件，文件数量请尽可能少。**） 
+ - 迁入对应的云信应用appkey。
+ - 是否需要[漫游](https://faq.yunxin.163.com/#KB0014)。
+
+另外：针对群消息，若新进群用户希望能查阅历史消息，**请在云信控制台打开「新进群用户获取历史消息开关」，配置方法：应用 > IM 即时通讯 > 功能配置 > 群聊 > 新进群用户获取历史消息。**
+
+#### <span id="4.2 增量消息">4.2 增量消息</span>
+
+若应用迁移模式是**新老兼容迁移**，则在迁移过程中，会产生增量消息，考虑到历史消息迁移存在实时性的问题，可使用如下方式：
+
+ - 提供一个对云信开放的 HTTP 接口，由云信这边发起 GET 请求。需提前约定 GET 的频率，如 1 小时一次。
+ - 收到GET后返回{"code":200, "data":[msg1,msg2,……]}。data 为 JSONArray，内容为增量消息，消息格式参见消息体格式介绍章节。
+
+存量消息与增量消息迁移之后，可通过客户端 SDK 和服务端 API 的 查询云端历史消息接口 拉取验证。
+
+注：免费版应用可查最近30天内的消息，正式版应用默认可查一年内的消息。
+
+### <span id="5、最近联系人列表迁移">5、最近联系人列表迁移</span>
+
+
+最近联系人列表（最近会话列表）的迁移，通过接收云端主动下推的[离线消息与漫游消息](https://faq.yunxin.163.com/#KB0014)，自动触发产生最近会话列表。
+
+由于离线和漫游消息有限，可通过如下方法维护更多最近会话列表：
+- 对于迁移之前的会话列表，需要自行根据原IM服务提供的老数据构造并维护会话列表；  
+- 对于迁移之后的会话列表，可以使用云信的消息抄送功能，在自身服务器进行全量会话列表的维护；或者开通**会话服务**功能，可从云端获取最多3000个最近会话。
+
+## <span id="消息体格式介绍">消息体格式介绍</span>
+
+注1：不能同时存在两条消息的 msgid 、 from 、 to/tid 、 createTime 这四者相同，否则会被覆盖。
+
+注2：ext字段为消息扩展字段，若原先无该字段，可忽略。
+
+注3：createTime请使用毫秒级别。
+
+注4：msgClientId 为客户端消息 ID，不能同时存在 msgClientId 相同的多条消息。如果为空，导入时会自动生成一个默认的 msgClientId。
+
+
+### <span id="单聊消息">单聊消息</span>
+#### <span id="aaa 发给 bbb 一条文本消息">aaa 发给 bbb 一条文本消息</span>
+
+```json
+{"data":{"ext":"ext..","clientType":"2","createTime":1513685265481,"msgid":1,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","from":"aaa","to":"bbb","body":"测试"},"type":0}
+```
+
+#### <span id="aaa 发给 bbb 一条图片消息">aaa 发给 bbb 一条图片消息</span>
+
+```json
+{"data":{"ext":"ext..","clientType":"2","createTime":1513685265528,"msgid":11,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","from":"aaa","to":"bbb","attach":"{\"h\":780,\"ext\":\"jpg\
+“,\"size\":2589,\"w\":1040,\"name\":\"haha\",\"url\":\"https://a1.ease5fb40/2c93186d\"}"},"type":1}
+```
+
+
+#### <span id="aaa 发给 bbb 一条语音消息(dur 单位是 ms)">aaa 发给 bbb 一条语音消息(dur 单位是 ms)</span>
+
+
+```json
+{"data":{"ext":"ext..","clientType":"2","createTime":1513685265528,"msgid":101,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","from":"aaa","to":"bbb","attach":"{\"size\":5232,\"ext\":\" amr\",\"dur\":8000,\"url\":\"https://a1.easemob.files/f3bdaffe174cee99f\"}"},"type":2}
+```
+
+
+#### <span id="aaa 发给 bbb 一条视频消息(dur 单位是 ms)">aaa 发给 bbb 一条视频消息(dur 单位是 ms)</span>
+
+```json
+{"data":{"ext":"ext..","clientType":"2","createTime":1513685265528,"msgid":1001,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","from":"aaa","to":"bbb","attach":"{\"h\":780,\"w\":1040,\"size\":5232,\"ext\":\" mp4\",\"dur\":8000,\"url\":\"https://a1.easeatfiles/f3-ffe174cee99f\"}"},"type":3}
+```
+
+
+#### <span id="aaa 发给 bbb 一条地理位置消息">aaa 发给 bbb 一条地理位置消息</span>
+
+```json
+{"data":{"attach":"{\"lng\":\"116.655294\",\"title\":\"新华南路 145 号
+\",\"lat\":\"39.89611\"}","clientType":"1","createTime":"1537262375000","ext":"","msgid":100561,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","from":"aaa","to":"bbb"},"type":4}
+```
+
+
+#### <span id="aaa 发给 bbb 一条文件消息">aaa 发给 bbb 一条文件消息</span>
+
+
+```json
+{"data":{"ext":"ext..","clientType":"2","createTime":1513685265528,"msgid":10501,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","from":"aaa","to":"bbb","attach":"{\"size\":5232,\"ext\":\" ttf\",\"url\":\"https://a1.easemob.com/hywtfiles/f3bda-ffe174cee99f\"}"},"type":6}
+```
+
+
+#### <span id="aaa 发给 bbb 一条自定义消息">aaa 发给 bbb 一条自定义消息</span>
+
+```json
+{"data": {"attach": {"param": {"ptId": "f5","pe": "http: //img.u.com/zmw/upad/2014/92!/0/quty-90/fobp","artisanName": "","productPrice": "66.0","productName":
+"helase"},"type": "1","url": "","desc": "作息"},"clientType": "1","createTime": "1539499209000","ext": "","msgid":10534501,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","from": "aaa","to": "bbb"},"type": 100}
+```
+
+### <span id="群聊消息">群聊消息</span>
+#### <span id="A 发了一条文本消息">A 发了一条文本消息</span>
+
+```json
+{"data":{"ext":"ext..","createTime":1511513944827,"clientType":16,"msgid":1,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","accid":"aaa","body":"哈哈","tid":1},"type":0}
+```
+#### <span id="A 发了一条图片消息">A 发了一条图片消息</span>
+
+```json
+{"data":{"ext":"ext..","createTime":1511513944827,"clientType":16,"msgid":1231,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","accid":"aaa","attach":"{\"h\":780,\"ext\":\"jpg\",\"size\":257389,\"w\":1040,\"name\":\"haha\",\"url\":\"https://a1.easemob.com/hywwjugh/jugh/chatfiles/ba05f0e0- e469-11e7-86e2- 5b402c93186d\"}","tid":1},"type":1}
+```
+
+#### <span id="A 发了一条语音消息(dur 的单位是 ms)">A 发了一条语音消息(dur 的单位是 ms)</span>
+
+```json
+{"data":{"ext":"ext..","createTime":1511513944827,"clientType":16,"msgid":13,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","accid":"aaa","attach":"{\"size\":5232,\"ext\":\" amr\",\"dur\":8000,\"url\":\"https://a1.easemob.com/hywwjugh/jugh/chatfiles/f3bda300-e469-11e7-9508-ffe174ce e99f\"}","tid":1},"type":2}
+```
+
+#### <span id="其他类型消息参考单聊">其他类型消息参考单聊</span>
+
+### <span id="群操作通知消息">群操作通知消息</span>
+
+#### <span id="B 被 A 拉进群">B 被 A 拉进群</span>
+
+```json
+{"data":{"accid2":"aaa","createTime":1511513944871,"clientType":16,"msgid":3,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","accid":"bbb","tid":1},"type":101}
+```
+#### <span id="A 把 B 踢出群">A 把 B 踢出群</span>
+
+```json
+{"data":{"accid2":"bbb","createTime":1511513944871,"clientType":16,"msgid":4,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","accid":"aaa","tid":1},"type":102}
+```
+#### <span id="A 禁言 C">A 禁言 C</span>
+
+```json
+{"data":{"accid2":"ccc","createTime":1511513944871,"clientType":16,"msgid":5,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","accid":"aaa","tid":1},"type":103}
+```
+
+#### <span id="A 取消禁言 C">A 取消禁言 C</span>
+
+```json
+{"data":{"accid2":"ccc","createTime":1511513944871,"clientType":16,"msgid":6,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","accid":"aaa","tid":1},"type":104}
+```
+#### <span id="A 任命 C 为管理员">A 任命 C 为管理员</span>
+
+```json
+{"data":{"accid2":"ccc","createTime":1511513944871,"clientType":16,"msgid":7,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","accid":"aaa","tid":1},"type":105}
+```
+
+#### <span id="A 取消 C 为管理员">A 取消 C 为管理员</span>
+```json
+{"data":{"accid2":"ccc","createTime":1511513944871,"clientType":16,"msgid":8,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","accid":"aaa","tid":1},"type":106}
+```
+
+#### <span id="A 修改了群介绍">A 修改了群介绍</span>
+
+```json
+{"data":{"createTime":1511513944871,"clientType":16,"tinfo":{"14":"new","tid":1},"msgid":9,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","accid":"aaa","tid":1},"type":107}
+```
+
+#### <span id="A 修改了加群认证方式">A 修改了加群认证方式</span>
+
+
+```json
+{"data":{"createTime":1511513944872,"clientType":16,"tinfo":{"16":"0","tid":1},"msgid":10,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","accid":"aaa","tid":1},"type":107}
+```
+ 
+#### <span id="A 把群转让给了 C">A 把群转让给了 C</span>
+
+```json
+{"data":{"accid2":"ccc","createTime":1511513944872,"clientType":16,"msgid":11,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","accid":"aaa","tid":1},"type":108}
+```
+
+#### <span id="A 退出了群">A 退出了群</span>
+
+
+```json
+{"data":{"createTime":1511513944872,"clientType":16,"msgid":12,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","accid":"aaa","tid":1},"type":109}
+```
+#### <span id="C 解散了群">C 解散了群</span>
+
+
+```json
+{"data":{"createTime":1511513944872,"clientType":16,"msgid":13,"msgClientId":"bec7df36-a8e4****e6abb76d58ee","accid":"ccc","tid":1},"type":110}
+```
+
+### <span id="群相关参数介绍">群相关参数介绍</span>
+
+对于修改群信息这类通知:
+
+tinfo这个子json串，必须包含 tid，且和父串中的 tid 保持一致。例子中可以看到，14这个key表示的是群介绍，16这个key 表示的是加群方式，其他项如下：
+
+key | 数据类型 | 含义 
+---|---|---|
+14 | string |表示群介绍
+15 | string| 表示群公告
+16 | int|表示入群权限，0 表示不需要申请，1 表示需要申请，2 表示不允许申请
+17 | int|表示群状态，0 表示正常状态，1 表示禁言
+18 | string|表示第三方扩展字段
+19 | string|表示第三方服务器扩展字段
+20 | string|群 icon
+21 | int|表示被邀请人同意方式，0 表示需要同意，1 表示不需要同意
+22 | int|表示谁可以邀请他人入群，0 表示管理员，1 表示所有人
+23 | int|表示谁可以修改群资料，0 表示管理员，1 表示所有人
+24 | int|表示谁可以更新群自定义属性，0 表示管理员，1 表示所有人
+
+
+## <span id="客户端类型参数介绍">客户端类型参数介绍</span>
+对于客户端类型(ClientType)，表示上述操作的来源客户端: <br/>
+
+枚举值 | 客户端类型
+---|---
+1 | 表示 AOS(Android)
+2 | 表示 iOS
+4 | 表示 PC
+8 | 表示 WINPHONE
+16 | 表示 WEB
+32 | 表示 REST(Server)
+64 | 表示 MAC

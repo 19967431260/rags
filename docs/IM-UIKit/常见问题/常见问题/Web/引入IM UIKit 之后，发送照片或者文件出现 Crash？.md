@@ -1,0 +1,51 @@
+如果发送照片或者文件的时候出现 crash，并触发报错`java.lang.IllegalArgumentException: Failed to find configured root that contains /data/user/0/*** /cache/nim/file/ ***at androidx.core.content.FileProvider$SimplePathStrategy.getUriForFile(FileProvider.java:800)`，说明没有`cache` 目录的读取权限（根据报错中的`*** /cache/nim/file/ ***`判断），需要在`FileProvidr` 中配置 `cache` 目录。
+
+
+
+
+配置步骤：
+
+
+
+
+
+1. 在工程的`AndroidManifest.xml`文件中的`<Application>`节点配置如下`provider`内容。
+
+
+    ```java
+    <provider
+        android:name="com.netease.yunxin.kit.common.utils.CommonFileProvider"
+        android:authorities="${applicationId}.IMKitFileProvider"
+        android:exported="false"
+        android:grantUriPermissions="true">
+        <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/file_paths" />
+    </provider>
+
+    ```
+
+
+2. 在工程的`res`目录下，添加`xml`目录，并创建`file_paths.xml`文件。在文件中添加如下内容。
+    ```java 
+    <paths>
+        <external-path
+            name="root"
+            path="." />
+        <external-cache-path
+            name="tempPictures"
+            path="TempPictures" />
+        <!-- cache 目录报错添加 -->
+        <cache-path
+            name="cachePath"
+            path="."/>
+    </paths>
+    ```
+
+
+
+:::note note
+- 发送照片或者文件时出现 crash 也可能触发其他类似报错，以上仅以`cache` 目录的配置步骤为例进行说明。
+- 如果报错提示无其他目录的读取权限，添加相应的`path`即可，配置步骤类似。
+:::
+
