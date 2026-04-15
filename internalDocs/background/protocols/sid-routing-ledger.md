@@ -1,0 +1,351 @@
+# SID Routing Ledger
+
+Use this file after you already know the protocol family is **IM V1/V9** or are looking at a legacy `SID-CID`.
+
+First normalize versions:
+- `V1 = V9`
+- `V2 = V10`
+- v2-side mappings for the SIDs below are mostly: `2 -> 26`, `3 -> 34`, `5 -> 27`, `7 -> 30`, `8 -> 31`, `13 -> 36`
+- `SID 4` 更像登录后的下行通知/同步面，排障时常作为 `5-*` / `7-*` / `8-*` 的结果面来读，不一定有稳定的一一对应 v2 主动接口号
+- If you already have a raw V10 client protocol such as `27-1`, `30-6`, `31-23`, `34-1`, `36-2`, read `v2-sdk-client-protocol-notes.md` first, then come back here for troubleshooting routing.
+
+## SID 2 — Auth / login / multi-device session control
+- Main meaning: 登录、Web 登录、被踢、主动登出、多端在线状态与踢端。
+- Typical CIDs:
+  - `2-2` 登录
+  - `2-3` Web 登录
+  - `2-5` 被踢（更常见于端侧日志，不一定直接出现在 Kibana）
+  - `2-7` 多端登录通知
+  - `2-8` 踢指定端
+- Practical cues worth remembering:
+  - `2-2 / 2-3 -> 26-2 / 26-3`：高价值错误优先看 `101302` 走错单元、`101303` appkey 不存在、`102302` token 校验失败、`102404` accid 不存在、`102422` 账号被禁用、`463` 第三方回调 deny。
+  - `417` 在登录域不只表示“服务端故障”，源文档明确给了“不允许自动登录”的几类场景：首次登录、device 已注销/互踢、有其他桌面端在线。
+  - `2-5` 被踢通知更多体现为端侧回调 / SDK 事件，不要期待 Kibana 一定能直接搜到原始 `2-5`。
+  - `2-7` 返回的是 Presence 子集（`consid / clientType / deviceId / os / loginTime / clientIp` 等），适合用来判多端是否真的同时在线、哪个端先后上线/下线。
+- Common troubleshooting entry points:
+  - 登录失败、重复登录、频控、token/accid 校验失败
+  - 被踢、串端、怀疑多端状态异常
+  - 登录成功但后续同步/推送表现异常，需要先确认登录阶段是否正常
+- Typical misreads / error patterns:
+  - 把 `101302` 直接说成“账号密码错”：不对，它更像 app 集群 / 单元走错，需要重新 LBS 或换正确接入点。
+  - 把 `417` 统一说成 SDK bug：不对，常见是自动登录前置条件不满足，或 device 已被注销 / 互踢。
+  - 因为“后面没推送 / 没补消息”就只查 push / roaming：不对，如果登录本身没稳住，后续 `3-* / 5-* / 4-*` 都可能是假象。
+  - 把 `2-8` 踢指定端、`2-7` 多端状态变化当成消息投递问题：不对，它们更偏会话控制面。
+- Log / trace hints:
+  - iOS 初始化登录日志里直接看 `onLogin`、`onAutoLoginFailed`、`onKickout`、`onMultiLoginClientsChanged` 这几个回调；文档已明确把“多端登录冲突 / 账号被封禁 / 操作过于频繁”列为需要上层处理的错误。
+  - Android 真实成功样例可直接认这组串联：`PacketHeader [SID 2 , CID 2 ... RES 200]` -> `onLoginUI SDK login success, account=...`；若接着还能看到 push 进程里的 `onLoginPush SDK login success`，说明 UI / push 双进程登录都已落地，不要再把后续问题先归到“根本没登录上”。
+  - Web SDK 手册里可直接监听 `logined / multiPortLogin / kicked / willReconnect / disconnect / syncdone`；做多端或被踢排查时，这些事件比只盯业务消息更有效。
+  - 一个很实用的边界样例：`disconnect` 后直接 `connect` 重新登录时，Web SDK 会沿用上次退出时间戳做增量同步；如果客户说“重新登录后没拿到 onsessions / 全量会话”，先解释这是增量逻辑，不要先怀疑 `SID 5/4` 丢包。
+  - 若登录成功后完全没看到后续 `SID 5 CID 1` 同步请求，优先回到登录 / 建链阶段；不要直接下结论说漫游或 ACK 功能异常。
+- Route to:
+  - `references/evidence/logs/ios-init-login-log-interpretation.md` — 看建链 / 登录 / 自动重连 / 重复登录
+  - `references/playbooks/push/push-quick-backtrace.md` — 若问题表现为“没推送”，先反查登录时实际上报了什么
+  - `references/playbooks/im/roaming-troubleshooting.md` — 若问题表现为“登录后没补消息 / 换端历史缺失”
+- Source anchors:
+  - `references/sources/protocol-sources.md`
+  - `tmp/popo-doc-export/docs/8d17c39cd9814ef694488eb3c40f009c__v2错误码v2错误码和协议文档.md` (SID 2 section)
+  - `tmp/popo-doc-export/docs/401b6fc04a8e4b629cd50543a6531e1f__v2-sdk协议.md` (`2-2/2-3 -> 26-2/26-3`)
+  - `tmp/popo-doc-export/docs/1448abbb92af4c8f866c4cd611f7c94e__iOS初始化登陆日志解读.md`
+  - `tmp/popo-doc-export/docs/6db4fce7aa6e4aa4a9b569eebc0c9acc__云信-WebSDK问题调查手册.md`
+- Notes:
+  - `2-4` 是服务器内部协议，不要把它当客户端接口解释。
+  - 若用户只给了 `101302 / 101303 / 102302 / 102404` 这类六位码，应切回 v2 readable-code 解释，不要按原始 SID-CID 读。
+
+## SID 3 — User / push token / relation & profile state
+- Main meaning: 用户侧状态与资料，包括 push token、前后台状态、黑名单/静音、uinfo、donnop、机器人列表。
+- Typical CIDs:
+  - `3-1` 更新 push token
+  - `3-2` 前后台状态
+  - `3-3 / 3-5` 黑名单 / 静音名单变更
+  - `3-7 / 3-9 / 3-10` 查别人资料 / 查自己资料 / 更新自己资料
+  - `3-13 / 3-15` 更新免打扰 / donnop
+- Practical cues worth remembering:
+  - `3-1 -> 34-1`：这是 push 侧最先要确认的“客户端到底有没有把 token 带上来”；v1 源文档还强调 `int:1` 表示 pushkit，不填/`0` 表示 APNs。
+  - `3-2 -> 34-2`：iOS 前后台切换时应持续上报，且需要把 badge 一起带上；“离线红点有、推送没来”时，这个状态比消息链路本身更值得先查。
+  - `3-13 / 3-15 -> 34-13 / 34-15`：一个是免打扰配置，一个是桌面端在线时移动端是否仍需推送（donnop）；它们更像“通知是否应触发”的门控，而不是消息是否投递成功。
+  - `3-3 / 3-5` 的 v2 高价值码可直接辅助解释：`102404` 目标账号不存在，`106429/105429` 不能把自己加到黑名单/静音，`106435/105435` 列表超限。
+  - `3-10` 更新资料若看到 `103451` 或 `463`，优先解释成资料反垃圾 / 第三方回调 deny，而不是消息 SDK 故障。
+- Common troubleshooting entry points:
+  - 推送收不到，先怀疑 token 未上报、前后台状态不对、免打扰配置影响
+  - 用户资料不同步、名片更新失败、静音/黑名单关系异常
+  - 桌面在线时移动端是否仍需推送（donnop）
+- Typical misreads / error patterns:
+  - 把“没推送”直接归因 APNs / 厂商通道：不对，很多时候根因在 `3-1 / 3-2 / 3-13 / 3-15`，即客户端根本没正确上报 token / 状态 / 免打扰配置。
+  - 把 `3-15` donnop 误判成“在线跳过推送异常”：不对，桌面在线是否仍推本来就是这个配置控制面。
+  - `3-7 / 3-9 / 3-10` 出错时直接跳消息丢失链路：不对，这更偏资料 / 名片 / 用户态配置。
+  - 看到 `103404` 就说“服务端没返回资料”：不稳，源文档明确 `3-9` 里它也可能只是“自上次 timetag 以来没变化”。
+- Log / trace hints:
+  - push 反查时，把 `3-1(token)`、`3-2(isBackground + badge)`、`3-13(DND)`、`3-15(donnop)` 连起来看，比只盯某一条 push 下发日志更有效。
+  - `3-1` 的字段样例很具体：`String:tokenName, string:推送token, int:1表示pushkit（不写/0 表示 apns）`；iOS PushKit / APNs 混用时，先确认这里到底上传的是哪一路，不要把 token 通道说反。
+  - Android 登录后的厂商推送样例也很值钱：`after login, mix push state=MixPushState{pushType=..., hasPushed=0 ...}`、`afterLogin: pushType ... hasPushed false ...`、`mi push on token:null` 这类日志一出现，优先解释成 token 还没拿到或没注册成功，而不是先怀疑云信 push 下发面。
+  - `3-2` 的字段样例是 `Boolean:isBackground` + `int:badge`；尤其 iOS 文档明确写了“每次前后台切换都要调用，并将 badge 更新到服务器上”，所以“离线红点对、推送缺失”时，这是比 APNs 回执更早该核对的锚点。
+  - 若用户说“桌面在线时手机不提醒”，先确认是否出现过 `3-15` / `4-13` 配置更新与同步，而不是先怀疑 APNs / 厂商通道抖动。
+  - 资料类问题若只见 `3-10` 命中 `103451 / 463`，应转向资料反垃圾 / 回调逻辑，不要继续按消息发送 trace 去找。
+- Route to:
+  - `references/playbooks/push/push-quick-backtrace.md` — 最实用，尤其是 `3-1 / 3-2 / 3-13 / 3-15`
+  - `references/playbooks/push/push-standard-troubleshooting.md` — 需要完整推送链路时
+  - `references/playbooks/im/safetong-internal-troubleshooting.md` — 若诉求偏资料、头像、自定义消息等 IM 用户态问题
+- Source anchors:
+  - `references/sources/protocol-sources.md`
+  - `tmp/popo-doc-export/docs/8d17c39cd9814ef694488eb3c40f009c__v2错误码v2错误码和协议文档.md` (SID 3 section)
+  - `tmp/popo-doc-export/docs/401b6fc04a8e4b629cd50543a6531e1f__v2-sdk协议.md` (`3-x -> 34-x` mappings and v2 error semantics)
+- Notes:
+  - `3-1` 失败常常不是“推送平台坏了”，而是客户端登录时根本没把 token 正确带上来。
+  - `3-7/3-9/3-10` 更偏资料问题，不要误路由到消息投递链路。
+
+## SID 4 — Notify / offline-roaming-ack downstream sync
+- Main meaning: 登录后服务端向客户端下发的离线消息、系统通知、漫游消息、ACK 增量、donnop / 广播 / 单向删除等同步通知。
+- Typical CIDs:
+  - `4-4` 离线消息同步
+  - `4-6` 离线 system 消息同步
+  - `4-9` 漫游消息同步（每个会话一个包）
+  - `4-12` 单聊已读回执时间戳同步
+  - `4-13` donnop 配置同步
+  - `4-14` 会话 ACK 列表登录同步
+  - `4-16` 离线广播同步
+  - `4-22` 漫游是否完整 / 是否还有更多
+  - `4-24` 删除会话历史的同步通知
+- Practical cues worth remembering:
+  - `4-4 / 4-6` 更像“登录后补收”的离线结果，不要拿它去对照在线收包的 `7-2 / 7-3`。
+  - `4-9` 是按会话下发的漫游包；如果用户说“登录后历史没补全”，先看 `5-1(tag7)` 和后续 `4-9`，而不是只盯发送时的 `7-1`。
+  - `4-14` 是服务端根据 `5-1(tag18=SESSION_ACK_LIST)` 算出的 ACK 增量；它缺失时，未读异常常常是“同步起点不对”而不是“消息没送达”。
+  - `4-22` 只在“漫游不全”时才有意义；它没出现，不等于一定漫游完整，还要考虑功能未开通。
+  - `4-13` 是 donnop / 免打扰同步结果；若是“桌面在线时移动端不推”，不要误判成 APNs / 厂商推送链路故障。
+- Common troubleshooting entry points:
+  - 登录后“消息自己补下来 / 没补下来 / 未读数突然变化 / 广播或 donnop 配置变化”
+  - 客户端说“没收到 7-2 / 8-2”，但其实登录补偿应看 `4-4 / 4-9`，不是主动发送协议
+  - 多端未读数、已读回执、换端状态不一致，需要确认服务端到底有没有下发 ACK 增量
+- Typical misreads / error patterns:
+  - 把 `SID 4` 当成业务主动接口：不对，它更像“结果面 / 下行面”。
+  - 因为没看到 `7-2` 就说服务端没投递：不对，登录补偿通常落在 `4-4 / 4-9`。
+  - 因为没看到 `4-22` 就说“没有断层”：不稳，源文档明确提到功能未开通时也可能没有 `4-22`。
+  - `4-9` 正常但 UI 仍缺消息：优先转客户端监听 / DB / 过滤器，不要继续只怀疑漫游库。
+- Log / trace hints:
+  - Android 登录流程文档明确写到：`5-1` 发出后，服务端会“下发各种需要同步的数据，包含离线消息、漫游消息、群信息等”，且 **P2P / 群消息不是通过 `7-1 / 8-2` 下发**。
+  - iOS 登录日志里，先看到 `<<<<begin to sync:` / 各 tag 值，再发 `<<<<Send Packet : SID 5 CID 1 SER 2`；`SID 4` 类包通常就在这一同步窗口内出现。
+  - `4-9` 的最实用样例锚点来自漫游排查文档：**服务器收到 `5-1(tag7)` 后，会按会话逐个下发 `4-9`**；如果日志上能看到 `4-9` 但 UI 没补齐，优先读成客户端监听 / DB / 过滤器问题，而不是漫游库没数据。
+  - `4-14` 的字段锚点可直接按协议文档读：`StrLongMap: p2p会话ACK列表`、`LongLongMap: team会话ACK列表`、`long: 本次同步的服务器时间戳`；这能帮助把“未读跳变”快速收敛到 ACK 增量，而不是消息投递本身。
+  - `4-12` 的字段锚点是 `ArrayMable<Property>`（`TalkMsgTag` 的 `fromAccount/timetag` 子集）+ `long: 本次同步的服务器时间戳`；如果用户说“对端明明已读但本端时间线没推进”，可先判断是否根本没收到这个同步包。
+  - `4-22` 的真实 server-side clue 不是“没看到就一定完整”，而是：客户声称“超过 100 条漫游仍查不到可信时间戳”时，若按 uid 搜不到 `4-22`，源文档已有现成案例说明 **可能只是该能力未开通**，不要先判为 SDK 漏收。
+  - 查未读异常时，把 `7-16 -> 5-1(tag18) -> 4-14` 串起来看；查漫游不全时，把 `5-1(tag7) -> 4-9 -> 4-22` 串起来看。
+  - 一个高价值 Kibana 读法：直接按 `uid` 搜，往往能一屏同时看到 `5-1`、`4-9`、`4-14`、`4-4`、`7-116` 这些关联协议，比只盯单条消息 ID 更适合判断“问题卡在同步面还是业务发送面”。
+- Route to:
+  - `references/playbooks/im/roaming-troubleshooting.md` — `4-9 / 4-22` 最直接
+  - `references/playbooks/im/unread-state-troubleshooting.md` — `4-12 / 4-14` 最直接
+  - `references/playbooks/im/message-loss-triage.md` — 用来先分在线投递、离线补偿、漫游补偿
+  - `references/playbooks/push/push-quick-backtrace.md` — 若实际怀疑的是 `4-13` donnop / 广播通知配置影响
+- Source anchors:
+  - `references/sources/protocol-sources.md`
+  - `tmp/popo-doc-export/docs/8d17c39cd9814ef694488eb3c40f009c__v2错误码v2错误码和协议文档.md` (SID 4 section)
+  - `tmp/popo-doc-export/docs/a32a8c9a8dbb4fc9a9eb1306a8c58208__漫游问题排查.md` (`5-1 -> 4-9`)
+  - `tmp/popo-doc-export/docs/3098e491e25e419ebc171d38b2795182__未读数问题排查.md` (`7-16 -> 5-1(tag18) -> 4-14`)
+  - `tmp/popo-doc-export/docs/325ea6b55d964d0f8e24747f2acd3d31__可信时间戳问题排查.md` (`4-22`)
+- Notes:
+  - `SID 4` 更多是“结果面 / 下行面”，不要把它误当成业务侧主动调用入口。
+  - `4-22` 缺失时，要同时记得排查“该能力是否开通”。
+
+## SID 5 — Sync / login-time cursor upload
+- Main meaning: 客户端登录后上报各类同步游标，告诉服务端“我本地同步到哪里了”，再由服务端决定后续下发哪些 `SID 4` / 其他同步数据。
+- Typical CIDs:
+  - `5-1` 通用同步
+  - `5-2` 群成员同步
+  - `5-3` 超大群成员同步
+- Practical tags worth remembering:
+  - `tag 7` 漫游时间戳，决定 `4-9` 漫游补偿起点
+  - `tag 18` `SESSION_ACK_LIST`，决定 `4-14` ACK 增量起点
+  - `tag 20` 广播消息游标，决定广播未读补偿
+- Common troubleshooting entry points:
+  - 登录后历史 / 未读 / 广播 / 群成员状态异常，先看 `5-1/5-2/5-3` 带的游标是否合理
+  - 换端后“消息没补全 / 已读变未读 / 广播丢失”，往往不是发送协议有问题，而是同步起点不对
+  - Android / iOS 初始化日志里确认登录成功后下一步是否真的发了同步请求
+- Typical misreads / error patterns:
+  - 把 `5-1` 回包 `200` 当成“历史 / 未读一定补全”：不对，它只说明同步流程结束，还要结合 `4-9 / 4-14 / 4-16`。
+  - 把 `5-1` 当成消息下发协议：不对，它是“游标上传 / 同步请求”；真正补偿通常落在 `4-*`。
+  - `5-2 / 5-3` 报 `414` 时，优先回到参数层面（如 tid 数量超限），不要直接怀疑群成员同步逻辑本身。
+- Log / trace hints:
+  - Android 登录流程里可直接搜：`SDK send login sync data request`、`request sync time tags`、`send PacketHeader [SID 5 , CID 1 ...]`、`SDK login sync data succeed`。
+  - Android 现成样例里能看到完整字段串：`SyncTimeTagData{... roamingMsgTimeTag=0 ... sessionAckListTimeTag=0 ... lastBroadcastMsgId=0 ...}`，这正好对应 `tag 7 / 18 / 20` 的排障入口；如果客户说“只丢历史、不丢未读”或反过来，这三个字段能直接帮你分层。
+  - `5-1` 的真实读法不是只看发没发，而是看**上传的游标值像不像客户端当前真实本地状态**：漫游文档明确说 `5-1(tag7)` 一般应是“客户实际收到的最后一条消息时间戳”；未读文档则明确 `5-1(tag18)` 是“所有会话 ACK 中离当前时间最近的一个 ACK”。
+  - iOS 初始化登录日志里会先打印 `<<<<begin to sync:` 和一串 tag/value；其中 `tag 7 value 0`、`tag 20 value 0` 这类样例很适合直接拿来解释“首次登录/本地无游标”的含义，随后出现 `<<<<Send Packet : SID 5 CID 1 SER 2`，同步完成后可见 `<<<<sync completed 200`、`<<<<set roam sync timetag`。
+  - Android 回包窗口同样有稳定样例：`received PacketHeader [SID 5 , CID 1 ... TAG 2 ...]` -> `SDK login sync data succeed` -> `save sync time tags: roamingMsgTimeTag =...`；这组串出现时，更适合解释成“同步阶段已收尾”，不要再把后续 UI 差异先归到 `5-1` 没走。
+  - server-side 代表性 clue：如果 `5-1(tag7)` 正常、漫游库也确认有数据，但到登录窗口结束仍没有任何 `4-9`，源文档明确记录这更像 **服务端同步面 bug（私有化更常见）**；这时不要继续把锅压给客户端监听。
+  - server-side 另一条常见 clue：`5-2 / 5-3` 若报 `414`，更像 tid 数量 / 参数层超限；Web 手册还特别提到群成员同步后来拆到 `5-2 / 5-3`，不要再用旧思路要求 `5-1` 同步群成员。
+  - 如果登录成功后始终没看到 `5-1`，优先回头检查登录 / 建链阶段，而不是先下结论说漫游或 ACK 功能异常。
+- Route to:
+  - `references/evidence/logs/ios-init-login-log-interpretation.md` — 登录后是否发出 `5-1`，以及 time tag 怎么看
+  - `references/playbooks/im/roaming-troubleshooting.md` — `5-1(tag7)` 是否导致 `4-9` 漫游缺失
+  - `references/playbooks/im/unread-state-troubleshooting.md` — `5-1(tag18)` 与 `4-14` ACK 增量的关系
+  - `references/playbooks/im/message-loss-triage.md` — 先判断应查在线发送还是登录补偿
+- Source anchors:
+  - `references/sources/protocol-sources.md`
+  - `tmp/popo-doc-export/docs/8d17c39cd9814ef694488eb3c40f009c__v2错误码v2错误码和协议文档.md` (SID 5 section)
+  - `tmp/popo-doc-export/docs/401b6fc04a8e4b629cd50543a6531e1f__v2-sdk协议.md` (`5-1/5-2/5-3 -> 27-1/27-2/27-3`)
+  - `tmp/popo-doc-export/docs/444d2384aca74c1ba879ee9c8ca6e575__IM登录流程--Android.md`
+  - `tmp/popo-doc-export/docs/1448abbb92af4c8f866c4cd611f7c94e__iOS初始化登陆日志解读.md`
+- Notes:
+  - `5-1` 是“同步请求/游标上传”，不是消息真正下发的协议；真正补下来的常常落在 `4-*`。
+  - `5-1 / 5-2 / 5-3` 的主要价值是告诉你“服务端应从哪里开始补”。
+
+## SID 7 — P2P talk / send-read-recall-session operations
+- Main meaning: 单聊消息发送、系统通知/自定义系统通知、历史查询、已读回执、撤回、会话 ACK、广播、自删除历史等。
+- Typical CIDs:
+  - `7-1` 单聊发送消息
+  - `7-2` 收到单聊消息通知
+  - `7-3` 收到系统通知
+  - `7-6` 单聊云端历史查询
+  - `7-7` 自定义系统通知发送
+  - `7-11 / 7-12` 已读回执发送 / 通知
+  - `7-13` 撤回消息
+  - `7-16` 会话 ACK 上报
+  - `7-17` 广播通知
+  - `7-18` 删除某会话历史
+  - `7-23 / 7-24` 单向删除单条 / 批量消息
+  - `7-31` 修改单聊消息
+  - `7-101 / 7-116 / 7-118` 多端同步发送 / ACK / 删除历史
+- High-value errors / tags:
+  - `7-1 -> 30-1`：`414` 参数错；`102404` 对方 accid 不存在；`102421` 发送方被禁言；`107410` 应用被禁言；`102426` 发送方被对方拉黑；`463` 第三方回调默认 deny。
+  - `7-1` 命中反垃圾时，服务端仍可能回 `200`；源文档明确要求继续看 `TalkMsgTag` 新增字段（`24 + 53`）或日志里的 `antiSpam` 相关扩展，而不是只看 transport code。
+  - `7-1` 若是“200 + deny”，v2 文档提到还要继续看 `tag=54`。
+  - `7-11 -> 30-11`：常见是 `414` 参数错、`102404` 对方 accid 不存在；另有“功能未开通”场景，不要把已读失败直接说成 SDK bug。
+  - `7-13 -> 30-13`：`107314` 撤回超时、`107315` 非发送者/群管理员撤回、`102404` 对方不存在、`463` 第三方回调 deny。
+  - `7-16` 核心字段是 `sessionType / ackmsgts / other`，它表达“该会话已读位置”，不是消息送达证明。
+- Common troubleshooting entry points:
+  - 单聊“发不出去 / 对方收不到 / 收到但未读异常 / 撤回失败 / 删除后多端不一致”
+  - 只给出 `102404 / 102426 / 463 / 107314` 这类 v2 码，需要回到 `7-* -> 30-*` 的单聊域解释
+  - 需要区分在线实时投递 (`7-1/7-2`) 还是登录后补偿 (`4-4/4-9`) 还是会话未读同步 (`7-16/4-14`)
+- Typical misreads / error patterns:
+  - `7-2` 没看到 ≠ 服务端没投递；登录补偿常走 `4-4 / 4-9`，且通过服务端 API 发消息时源文档还特别提示“不记录 `7-2`”。
+  - `7-16` 不是送达回执；它更接近“未读状态同步”，排障时要和 `5-1(tag18)`、`4-14` 一起看。
+  - `7-1` 返回 `200` 也不代表一定没问题：反垃圾、第三方回调 deny、黑名单都可能藏在 tag / 扩展字段 / trace 里。
+  - `hasOLlink=true` 只表示接收方在线，不等于 UI 一定消费成功。
+- Log / trace hints:
+  - 查单聊发送问题时，先找 `7-1` 原始返回码，再看是否带 `antiSpam`、`yidunAntiSpamRes`、回调 deny 相关字段。
+  - `7-1` 的两个高价值字段样例值得直接记：回包里常见 `msgid_client / msgid_server / time / yidunAntiSpamRes`，而通知面里 `hasOLlink:true` **只表示接收方在线**，不表示 UI 一定消费成功。
+  - 新版图片反垃圾链路里，`7-1 / 8-2` 不一定直接打出完整反垃圾错误码；应先从消息协议拿 `traceid`，再去搜对应 `0-0` 反垃圾日志，重点看 `antiSpam.code=514` 或 `yidun.code=200`。如果消息协议里还能看到 `antispam.microService.response`，基本就能直接判到新链路。
+  - 旧版反垃圾则可直接在 `7-1` 搜 `"antiSpam.code":408` / `500`；这类 case 不必先去找 `0-0`。这能帮助快速分清“同样是被拦，为什么有的单子 7-1 能直接看到码，有的必须追 traceid”。
+  - `7-11` 的字段锚点别只记“已读回执”四个字：协议文档和专门说明都强调它上传的是 `toAccount + msgid_clientid (+ time)`，且**当前提交的消息时间必须大于之前已发送的已读时间，否则会被直接丢弃**。这对“明明点过已读但对端没推进”特别关键。
+  - `7-16` 最实用的 Kibana 字段样例是 `sessionType`、`ackmsgts`、`other`；其中 `other` 在 p2p 场景是对端 accid，在 team 场景是 tid。遇到“换端后很多已读会话重新变未读”，先看这里上报的会话集合是否和漫游下来的会话集合根本对不上。
+  - `7-13` 除了 `107314` 超时、`463` deny，还要记住真实边界：`107315` 是“不是消息发送者或者群管理员”，`107429` 是“不允许撤回自己给自己发的消息”，`107404` 是消息根本不存在。别把所有撤回失败都压成“超时了”。
+  - server-side 代表性 clue：Kibana 使用文档明确提到，`msg_serverId` 通常只在**发送成功**的消息里有；若 `7-1` 看不到正常 serverId、却能看到 antiSpam / deny / blacklist 线索，更应读成业务拒绝或反垃圾链路，而不是纯网络超时。
+  - 查未读问题时，优先按 `7-16 -> 5-1(tag18) -> 4-14` 追；查“发出去但登录后另一端才看到”时，优先按 `7-1 -> 4-4/4-9` 追。
+  - 撤回问题除了 `7-13` 返回码，还要核对消息是否存在、是否已超时、操作者是否具备身份。
+- Route to:
+  - `references/playbooks/im/message-loss-triage.md` — 单聊丢消息、在线/离线/漫游最直接入口
+  - `references/playbooks/im/unread-state-troubleshooting.md` — `7-11 / 7-16 / 4-12 / 4-14`
+  - `references/playbooks/im/roaming-troubleshooting.md` — `7-6 / 4-9` / 历史与漫游不一致
+  - `references/playbooks/im/safetong-internal-troubleshooting.md` — 自定义系统通知、资料类消息、客户端侧过滤等
+- Source anchors:
+  - `references/sources/protocol-sources.md`
+  - `tmp/popo-doc-export/docs/8d17c39cd9814ef694488eb3c40f009c__v2错误码v2错误码和协议文档.md` (SID 7 section)
+  - `tmp/popo-doc-export/docs/401b6fc04a8e4b629cd50543a6531e1f__v2-sdk协议.md` (`7-1/7-11/7-13/7-18 -> 30-*`)
+  - `tmp/popo-doc-export/docs/3098e491e25e419ebc171d38b2795182__未读数问题排查.md` (`7-16`)
+  - `tmp/popo-doc-export/docs/99a64f14099e42afbddcdc902b22799f__易盾图片反垃圾补充说明.md` (`7-1` 反垃圾 trace 取证)
+- Notes:
+  - `7-2` 是通知面；登录后补来的离线/漫游消息不一定再表现成原始 `7-2` 视角，别把“没看到 7-2”直接等同于“服务端没投递”。
+  - `7-16` 更接近未读状态同步，而不是“消息送达协议”；排障时要和 `5-1(tag18)`、`4-14` 一起看。
+  - `7-1` 返回 `200` 也不代表一定没问题，反垃圾 / 第三方回调 deny / 黑名单需要继续看 tag、traceid 和扩展字段。
+
+## SID 8 — Team / group lifecycle / group message & member state
+- Main meaning: 群创建、群消息、成员管理、群资料、群历史、群成员禁言与多端同步。
+- Typical CIDs:
+  - `8-1` 创建群
+  - `8-2` 群消息发送
+  - `8-5/8-6` 邀请 / 踢人
+  - `8-7/8-9/8-11` 改群资料 / 查群资料 / 拉群成员列表
+  - `8-19` 修改自己的群属性（含 `bits` 免打扰）
+  - `8-23` 群历史消息
+  - `8-25` 群成员禁言
+  - `8-101 / 8-102 / 8-111 / 8-119 / 8-126` 多端同步 / 成员同步类
+- Practical cues worth remembering:
+  - `8-2 -> 31-2`：高价值错误优先看 `109404` 非群成员、`108404` 群不存在、`102421` 发送方被禁言、`108423 / 108306` 群整体禁言、`107410` 应用被禁言、`463` 回调 deny。
+  - `8-2` 和 `7-1` 一样，命中反垃圾时服务端仍可能回 `200`；v2 文档明确写了要继续看 `TalkMsgTag` 新增字段（`23 + 53`），若是 `200 + deny` 还要看 `tag=54`。
+  - `8-19 -> 31-19` 的 `bits` 很实用：`0` 接收提醒、`1` 关闭提醒、`2` 仅接收管理员提醒。群消息“有红点没提醒 / 只有管理员消息提醒”时，先看这里。
+  - `8-23 -> 31-23` 是群历史 / 漫游接口，不要把历史缺失都压到实时发送 `8-2` 上。
+  - `8-25` 是成员禁言控制面；群里“只有某个成员发不出去”时，优先分清是 `8-25` 单成员禁言还是 `8-2` / `8-19` / 群整体禁言。
+- Common troubleshooting entry points:
+  - 群里“发不出去 / 收不到 / 历史缺失 / 已读异常 / 群成员状态不一致”
+  - 群禁言、群不存在、非群成员、群免打扰 / 仅管理员提醒
+  - 多端同步后群资料或成员列表不一致
+- Typical misreads / error patterns:
+  - 把 `108404` 说成“发送方不在群里”：不对，它更偏群不存在；`109404` 才更接近成员侧问题。
+  - `8-2` 返回 `200` 就判消息一定正常：不对，反垃圾 / 回调 deny 可能藏在 `TalkMsgTag` 扩展里。
+  - 看到“群消息没提醒”就只查 push：不对，`8-19(bits=1/2)` 本身就可能抑制提醒。
+  - 把多端同步 `8-102 / 8-119 / 8-126` 的状态不同步，误判成服务端没发群消息：不对，这更像成员 / 本地状态同步面。
+- Log / trace hints:
+  - 查群发送问题时，先看 `8-2` 原始返回码，再看是否带 `TalkMsgTag(23+53)` 的反垃圾扩展，必要时继续用 traceid 反查对应反垃圾日志。
+  - `8-19` 最实用的字段样例就是 `Property:tlist` 里带 `tid + bits + custom`；其中 `bits=0/1/2` 分别代表“接收提醒 / 关闭提醒 / 仅接收管理员提醒”。客户说“群里平时只有管理员消息提醒”时，这一条几乎就是直达锚点。
+  - 一个很具体的 Web 端样例：查询群历史 `8-23` 时如果传错群 ID，服务端会返回 `998`，最终 SDK 往往表现成“查询超时”；这类 case 不要先怀疑漫游库或消息发送面，先核对 tid。
+  - 查“群里能看到消息但没提醒”时，把 `8-2` 与 `8-19(bits)`、push 配置一起看；不要只按消息投递链路查。
+  - 群成员 / 资料不同步时，留意是否已有 `8-111 / 8-119 / 8-126` 这类同步包；这能帮助区分“实时发送没到”还是“成员状态没同步”。
+- Route to:
+  - `references/playbooks/im/message-loss-triage.md` — 群消息丢失、在线/离线/漫游分叉入口
+  - `references/playbooks/im/unread-state-troubleshooting.md` — 群 ACK / 未读同步 / 换端后未读异常
+  - `references/playbooks/im/roaming-troubleshooting.md` — 群历史 / 漫游补偿问题
+  - `references/playbooks/push/push-quick-backtrace.md` — 若用户表面说“群消息没提醒”，但本质可能是 `8-19` 群免打扰
+- Source anchors:
+  - `references/sources/protocol-sources.md`
+  - `tmp/popo-doc-export/docs/8d17c39cd9814ef694488eb3c40f009c__v2错误码v2错误码和协议文档.md` (SID 8 section)
+  - `tmp/popo-doc-export/docs/401b6fc04a8e4b629cd50543a6531e1f__v2-sdk协议.md` (`8-2 -> 31-2`, `8-19 -> 31-19`, `8-23 -> 31-23`)
+- Notes:
+  - `8-2` 排障时优先区分：参数错误 / 非群成员 / 群不存在 / 群整体禁言 / 单成员禁言 / 反垃圾 / 回调 deny。
+  - 看到“没推送”别只盯 push，群的 `bits` 配置也可能让通知被抑制。
+
+## SID 13 — Chatroom / enter-send-member-state-queue
+- Main meaning: 聊天室地址获取、鉴权进入、发消息、成员分页、历史消息、角色/黑名单/禁言、队列、标签相关能力。
+- Typical CIDs:
+  - `13-1` 获取聊天室地址
+  - `13-2` 进入聊天室鉴权
+  - `13-6` 聊天室发消息
+  - `13-8 / 13-9` 成员分页 / 历史消息
+  - `13-11 / 13-17 / 13-19` 设成员身份 / 踢人 / 临时禁言
+  - `13-20 ~ 13-26` 队列相关
+  - `13-30 ~ 13-36` 标签禁言 / 标签成员 / 标签消息查询
+- Practical cues worth remembering:
+  - `13-1 -> 36-1`：高价值错误优先看 `113404` 聊天室不存在、`113406` 聊天室已关闭、`113410` 功能未开通、`114426` 在黑名单中、`113304` 未获取到有效 link 地址。
+  - `13-2 -> 36-2`：常见高价值错误是 `101302` app 集群走错、`101303` appkey 不存在、`102302` token 校验失败、`113305` IM 主连接状态异常、`114426` 黑名单、`113451` 反垃圾、`463` 回调鉴权失败。
+  - `13-6 -> 36-6`：常见高价值错误是 `114421` 成员 / 标签禁言、`113423` 聊天室整体禁言、`102421` 账号被禁言、`107410` 应用被禁言、`463` 回调 deny。
+  - 队列最实用的字段不是“错误码”本身，而是 `transient`、`elementAccid`、以及 QS 历史通知中的 `317 / 320`：`317` 更像主动队列变更，`320` 更像离线 / 掉线触发的系统清理。
+  - `13-20` 新增队列元素时，若 `transient=true` 且 operator 不在线，源文档明确会返回 `403`；这类“元素自己消失 / 自动下麦”很多不是 RTC 问题，而是聊天室队列设计使然。
+  - `13-30` 是标签禁言控制面；“只有某类成员不能说话”时，要优先想到标签禁言，而不只是普通禁言或消息链路故障。
+- Common troubleshooting entry points:
+  - 进房失败、聊天室已关闭、房间黑名单、IM 主连接异常
+  - 聊天室发言失败、整体禁言、标签禁言
+  - 麦位 / 队列元素异常、系统自动下麦、管理员清理队列
+- Typical misreads / error patterns:
+  - 把 `13-2` 进房失败直接说成 RTC 入房失败：不对，聊天室进房首先是 IM / chatroom 鉴权链路。
+  - 把“下麦了但还能说话 / 听到声音”当成同一根因：不对，队列 / 麦位和 RTC 音频链路是两层，要先判聊天室队列是否变化。
+  - 看到 `13-6` 发言失败就只查文本反垃圾：不对，还要先分成员禁言、标签禁言、整体禁言、应用禁言、回调 deny。
+  - 把 `13-5 / 13-18` 当客户端主动接口：不对，这两个在源文档里都标成服务器内部协议。
+- Log / trace hints:
+  - 进房问题先按 `13-1 -> 13-2` 串起来看：先确认 link 地址是否拿到，再看鉴权失败是 token、黑名单、IM 主连接异常还是走错单元；若 v2 直接给 `113304`，可优先解释成 `13-1` 没拿到有效 link，而不是先说聊天室已关闭。
+  - 队列异常优先查 QS 历史消息里的 `id=317 / 320`；其中 `queueChange._e` 的 `OFFER / POLL / DROP / PARTCLEAR` 能直接解释是主动上麦、取出、清空还是因 `transient` 离线清理。
+  - 现成 QS 样例可直接当模板读：`{"data":{"operator":"holmespgq","target":["holmespgq"],"queueChange":"{\"_e\":\"OFFER\",\"key\":\"麦位1\",\"content\":\"holmespgq\"}"},"id":317}`；这里的 `operator / target / key / content` 已足够判断是谁把谁放上了哪个麦位。
+  - `13-20` 的字段样例要记住 `elementKey / elementValue / transient / elementAccid`；如果看到管理员代别人上麦，通常就该去核对 `elementAccid`，而不是默认把元素归到 operator 自己名下。
+  - Kibana 侧排队列时，可按房间号结合 `13-20 / 13-21 / 13-24 / 13-5`，以及服务端 `10015-11 / 10015-12 / 10015-14` 这几类操作一起看。
+  - 若用户反馈“被踢出聊天室”，除了 `13-17` 管理员踢人，也要记得核对 `13-3` 被踢通知和房间关闭 / 主连接异常等链路。
+- Route to:
+  - `references/playbooks/chatroom/chatroom-queue-troubleshooting.md` — 队列 / 麦位 / 317/320 事件最直接入口
+  - `references/playbooks/im/im-safetong-troubleshooting.md` — 若是聊天室消息丢失类泛化入口
+  - `references/playbooks/rtc/rtc-router-overview.md` — 用户把“麦位异常”误认为 RTC 音频问题时，用来分叉到音视频链路
+- Source anchors:
+  - `references/sources/protocol-sources.md`
+  - `tmp/popo-doc-export/docs/8d17c39cd9814ef694488eb3c40f009c__v2错误码v2错误码和协议文档.md` (SID 13 section)
+  - `tmp/popo-doc-export/docs/401b6fc04a8e4b629cd50543a6531e1f__v2-sdk协议.md` (`13-x -> 36-x` mappings and v2 errors)
+  - `tmp/popo-doc-export/docs/77a629a9985d43ea9b19069a902358bd__聊天室队列问题排查.md`
+  - `tmp/popo-doc-export/docs/f7d9f3de9af84f31a8ad12378362b275__聊天室踢出问题.md`
+- Notes:
+  - `13-5`、`13-18` 是服务器内部协议，不要当客户端接口解释。
+  - 队列异常与 RTC 听感异常不是同一层；先看聊天室队列事件，再决定是否切 RTC。
+  - `13-20/21/24/26` 与队列变更最相关；若问题是“元素自己消失”，优先核对 `transient=true` + 用户离线。
+
+## Fast routing rule
+- `2-*` 先看登录/建链/多端，再决定是否转 push 或同步。
+- `3-*` 先看用户态 / push token / 资料，不要直接判成消息投递故障。
+- `4-*` 先判断它是离线 / 漫游 / ACK / 广播 / donnop 哪种下行结果，再回溯到对应 `5-*` 或业务面协议。
+- `5-*` 先看同步游标是否合理，再看服务端后续有没有通过 `4-*` 真正补数据。
+- `7-*` 先分“单聊发送 / 系统通知 / 已读回执 / 会话 ACK / 撤回 / 广播 / 删除历史”。
+- `8-*` 先分“群消息 / 群成员 / 群历史 / 群通知配置”。
+- `13-*` 先分“进房鉴权 / 发言 / 成员状态 / 队列 / 标签”，再决定是否转 RTC。
+
+## Known gap
+- Service-side protocol quick reference is still only tracked by URL and has not been merged into local exported docs yet.
